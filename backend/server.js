@@ -17,6 +17,8 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 const BASE_URL = process.env.BASE_URL || `http://localhost:${PORT}`;
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+const OpenAI = require("openai");
+const openaiClient = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 // ─── Name matching helpers ───────────────────────────────────────────────────
 function normalizeStr(str) {
@@ -53,40 +55,55 @@ function businessMatchesText(name, url, text) {
   return false;
 }
 
-// ─── Real signal: Perplexity AI presence ────────────────────────────────────
-async function checkPerplexityPresence(name, url, category, location) {
+// ─── Location type detection ─────────────────────────────────────────────────
+function isNationalBusiness(location) {
+  if (!location) return true;
+  const loc = location.toLowerCase().trim();
+  return loc === "national" || loc === "online" || loc === "";
+}
+
+// ─── Real signal: OpenAI web search presence ─────────────────────────────────
+async function checkOpenAIWebSearchPresence(name, url, category, location) {
   const cat = category || "business";
   const loc = location || "any area";
-  const prompts = [
-    `best ${cat} in ${loc}`,
-    `recommend a ${cat} near ${loc}`,
-    `top ${cat} ${loc}`,
-  ];
+  const national = isNationalBusiness(location);
+
+  const prompts = national
+    ? [
+        `best ${cat} brand online`,
+        `top ${cat} brands`,
+        `where to buy ${cat} online`,
+      ]
+    : [
+        `best ${cat} in ${loc}`,
+        `recommend a ${cat} near ${loc}`,
+        `${cat} ${loc}`,
+      ];
 
   const results = await Promise.allSettled(
-    prompts.map((prompt) =>
-      fetch("https://api.perplexity.ai/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${process.env.PERPLEXITY_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "sonar",
-          messages: [{ role: "user", content: prompt }],
-          max_tokens: 512,
-        }),
-        signal: AbortSignal.timeout(15000),
-      }).then((r) => r.json())
-    )
+    prompts.map(async (prompt) => {
+      const response = await openaiClient.responses.create({
+        model: "gpt-4o-mini",
+        tools: [{ type: "web_search_preview" }],
+        input: prompt,
+      });
+      // output_text is a convenience accessor on the SDK; fall back to manual extraction
+      return (
+        response.output_text ??
+        (response.output || [])
+          .filter((o) => o.type === "message")
+          .flatMap((o) => o.content ?? [])
+          .filter((c) => c.type === "output_text")
+          .map((c) => c.text)
+          .join("") ??
+        ""
+      );
+    })
   );
 
   const promptResults = prompts.map((prompt, i) => {
     const r = results[i];
-    const text =
-      r.status === "fulfilled"
-        ? (r.value?.choices?.[0]?.message?.content || "")
-        : "";
+    const text = r.status === "fulfilled" ? r.value : "";
     return { prompt, matched: businessMatchesText(name, url, text) };
   });
 
@@ -96,6 +113,7 @@ async function checkPerplexityPresence(name, url, category, location) {
     promptsTested: prompts.length,
     promptsMatched: matched,
     prompts: promptResults,
+    queryType: national ? "national" : "local",
   };
 }
 
@@ -193,24 +211,24 @@ app.post("/api/audit", auditLimiter, async (req, res) => {
 
   try {
     // ── Run real signals in parallel ────────────────────────────────────────
-    const [perplexity, schema] = await Promise.all([
-      checkPerplexityPresence(name, url, category, location)
-        .catch((err) => ({ score: null, promptsTested: 3, promptsMatched: 0, prompts: [], error: err.message })),
+    const [aiSearch, schema] = await Promise.all([
+      checkOpenAIWebSearchPresence(name, url, category, location)
+        .catch((err) => ({ score: null, promptsTested: 3, promptsMatched: 0, prompts: [], queryType: "local", error: err.message })),
       checkSchemaMarkup(url)
         .catch((err) => ({ found: false, types: [], relevantTypes: [], schemasFound: 0, hasLocalBusiness: false, error: err.message })),
     ]);
 
     // ── Build real-signal context for Claude ─────────────────────────────────
-    const perplexityLine = perplexity.score !== null
-      ? `${perplexity.score}/100 — appeared in ${perplexity.promptsMatched}/${perplexity.promptsTested} AI search queries`
-      : `unavailable (${perplexity.error || "unknown error"})`;
+    const aiLine = aiSearch.score !== null
+      ? `${aiSearch.score}/100 — appeared in ${aiSearch.promptsMatched}/${aiSearch.promptsTested} ChatGPT web search queries (${aiSearch.queryType} prompts)`
+      : `unavailable (${aiSearch.error || "unknown error"})`;
     const schemaLine = schema.found
       ? `${schema.schemasFound} JSON-LD block(s) found; types: ${schema.types.join(", ")}; relevant: ${schema.relevantTypes.join(", ") || "none"}`
       : `no JSON-LD schema detected${schema.error ? ` (${schema.error})` : ""}`;
 
     const signalBlock = `
 REAL MEASURED SIGNALS (use these to anchor your scoring — do not contradict them):
-- Perplexity AI Presence: ${perplexityLine}
+- ChatGPT Web Search AI Presence: ${aiLine}
 - Schema Markup on ${url}: ${schemaLine}
 `;
 
@@ -229,7 +247,7 @@ Location: ${location || "Not specified"}
 ${signalBlock}
 
 For the "Structured Data & Schema" category score, use the schema signal above as the primary input.
-For the "AI Platform Presence" category score, use the Perplexity score above as the primary input.
+For the "AI Platform Presence" category score, use the ChatGPT Web Search score above as the primary input.
 The overallScore must reflect these real measurements — do not inflate it if AI presence is low.
 
 Respond ONLY with valid JSON, no markdown:
@@ -241,7 +259,7 @@ Respond ONLY with valid JSON, no markdown:
     const results = JSON.parse(raw.replace(/```json|```/g, "").trim());
 
     // ── Attach real signal results to response ────────────────────────────────
-    results.signals = { perplexity, schema };
+    results.signals = { aiSearch, schema };
 
     const auditId = uuidv4();
     const audit = {
