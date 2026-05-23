@@ -150,7 +150,8 @@ app.use(express.json());
 app.use(cors({ origin: process.env.FRONTEND_URL || "http://localhost:5173", methods: ["GET", "POST"] }));
 
 const globalLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 100, standardHeaders: true, legacyHeaders: false });
-const auditLimiter = rateLimit({ windowMs: 24 * 60 * 60 * 1000, max: 3, standardHeaders: true, legacyHeaders: false, message: { error: "Free audit limit reached.", message: "You have used your 3 free audits for today." } });
+const AUDIT_RATE_LIMIT = parseInt(process.env.AUDIT_RATE_LIMIT || "3", 10);
+const auditLimiter = rateLimit({ windowMs: 24 * 60 * 60 * 1000, max: AUDIT_RATE_LIMIT, standardHeaders: true, legacyHeaders: false, message: { error: "Free audit limit reached.", message: `You have used your ${AUDIT_RATE_LIMIT} free audits for today.` } });
 app.use(globalLimiter);
 
 function buildOGImage(businessName, score, location, category) {
