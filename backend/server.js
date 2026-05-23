@@ -63,7 +63,7 @@ app.post("/api/audit", auditLimiter, async (req, res) => {
   catch { return res.status(400).json({ error: "Invalid URL." }); }
   try {
     const message = await client.messages.create({
-      model: "claude-sonnet-4-20250514",
+      model: "claude-sonnet-4-6",
       max_tokens: 1024,
       messages: [{ role: "user", content: `You are an AEO expert. Analyze this business for AI agent visibility.\nBusiness: ${name}\nURL: ${url}\nCategory: ${category || "General"}\nLocation: ${location || "Not specified"}\n\nRespond ONLY with valid JSON no markdown:\n{"overallScore":<0-100>,"categories":[{"name":"Website Content Clarity","score":<0-100>},{"name":"Structured Data & Schema","score":<0-100>},{"name":"AI Platform Presence","score":<0-100>},{"name":"Review & Authority Signals","score":<0-100>},{"name":"Content Specificity","score":<0-100>}],"insights":[{"icon":"⚠️","text":"<observation>"},{"icon":"⚠️","text":"<gap>"},{"icon":"💡","text":"<opportunity>"}],"fixes":[{"priority":"critical","title":"<fix>","body":"<2 sentences>"},{"priority":"critical","title":"<fix>","body":"<explanation>"},{"priority":"high","title":"<fix>","body":"<explanation>"},{"priority":"high","title":"<fix>","body":"<explanation>"},{"priority":"medium","title":"<fix>","body":"<explanation>"}]}` }],
     });
