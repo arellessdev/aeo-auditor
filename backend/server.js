@@ -18,6 +18,100 @@ const PORT = process.env.PORT || 3001;
 const BASE_URL = process.env.BASE_URL || `http://localhost:${PORT}`;
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
+// ─── Real signal: Perplexity AI presence ────────────────────────────────────
+async function checkPerplexityPresence(name, category, location) {
+  const cat = category || "business";
+  const loc = location || "any area";
+  const prompts = [
+    `best ${cat} in ${loc}`,
+    `recommend a ${cat} near ${loc}`,
+    `top ${cat} ${loc}`,
+  ];
+
+  const results = await Promise.allSettled(
+    prompts.map((prompt) =>
+      fetch("https://api.perplexity.ai/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${process.env.PERPLEXITY_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "sonar",
+          messages: [{ role: "user", content: prompt }],
+          max_tokens: 512,
+        }),
+        signal: AbortSignal.timeout(15000),
+      }).then((r) => r.json())
+    )
+  );
+
+  const nameNorm = name.toLowerCase();
+  const promptResults = prompts.map((prompt, i) => {
+    const r = results[i];
+    const text =
+      r.status === "fulfilled"
+        ? (r.value?.choices?.[0]?.message?.content || "")
+        : "";
+    return { prompt, matched: text.toLowerCase().includes(nameNorm) };
+  });
+
+  const matched = promptResults.filter((p) => p.matched).length;
+  return {
+    score: Math.round((matched / prompts.length) * 100),
+    promptsTested: prompts.length,
+    promptsMatched: matched,
+    prompts: promptResults,
+  };
+}
+
+// ─── Real signal: Schema markup ──────────────────────────────────────────────
+const RELEVANT_SCHEMA_TYPES = [
+  "LocalBusiness", "Restaurant", "FoodEstablishment", "Organization",
+  "Store", "Service", "Product", "Place", "ProfessionalService",
+  "HealthAndBeautyBusiness", "LodgingBusiness", "SportsActivityLocation",
+];
+
+async function checkSchemaMarkup(url) {
+  const normalizedUrl = url.startsWith("http") ? url : `https://${url}`;
+  try {
+    const res = await fetch(normalizedUrl, {
+      headers: { "User-Agent": "AEOAuditor/1.0 (+https://aeoauditor.com)" },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) return { found: false, types: [], error: `HTTP ${res.status}` };
+
+    const html = await res.text();
+    const jsonLdRe = /<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
+    const schemas = [];
+    let m;
+    while ((m = jsonLdRe.exec(html)) !== null) {
+      try {
+        const parsed = JSON.parse(m[1].trim());
+        const items = Array.isArray(parsed) ? parsed : [parsed];
+        schemas.push(...items);
+      } catch { /* malformed block — skip */ }
+    }
+
+    const types = [
+      ...new Set(schemas.flatMap((s) => (Array.isArray(s["@type"]) ? s["@type"] : [s["@type"]]).filter(Boolean))),
+    ];
+    const relevantTypes = types.filter((t) =>
+      RELEVANT_SCHEMA_TYPES.some((rt) => t.includes(rt))
+    );
+
+    return {
+      found: schemas.length > 0,
+      types,
+      relevantTypes,
+      schemasFound: schemas.length,
+      hasLocalBusiness: relevantTypes.length > 0,
+    };
+  } catch (err) {
+    return { found: false, types: [], error: err.message };
+  }
+}
+
 app.use(express.json());
 app.use(cors({ origin: process.env.FRONTEND_URL || "http://localhost:5173", methods: ["GET", "POST"] }));
 
@@ -61,18 +155,74 @@ app.post("/api/audit", auditLimiter, async (req, res) => {
   if (!name || !url) return res.status(400).json({ error: "Business name and URL are required." });
   try { new URL(url.startsWith("http") ? url : `https://${url}`); }
   catch { return res.status(400).json({ error: "Invalid URL." }); }
+
   try {
+    // ── Run real signals in parallel ────────────────────────────────────────
+    const [perplexity, schema] = await Promise.all([
+      checkPerplexityPresence(name, category, location)
+        .catch((err) => ({ score: null, promptsTested: 3, promptsMatched: 0, prompts: [], error: err.message })),
+      checkSchemaMarkup(url)
+        .catch((err) => ({ found: false, types: [], relevantTypes: [], schemasFound: 0, hasLocalBusiness: false, error: err.message })),
+    ]);
+
+    // ── Build real-signal context for Claude ─────────────────────────────────
+    const perplexityLine = perplexity.score !== null
+      ? `${perplexity.score}/100 — appeared in ${perplexity.promptsMatched}/${perplexity.promptsTested} AI search queries`
+      : `unavailable (${perplexity.error || "unknown error"})`;
+    const schemaLine = schema.found
+      ? `${schema.schemasFound} JSON-LD block(s) found; types: ${schema.types.join(", ")}; relevant: ${schema.relevantTypes.join(", ") || "none"}`
+      : `no JSON-LD schema detected${schema.error ? ` (${schema.error})` : ""}`;
+
+    const signalBlock = `
+REAL MEASURED SIGNALS (use these to anchor your scoring — do not contradict them):
+- Perplexity AI Presence: ${perplexityLine}
+- Schema Markup on ${url}: ${schemaLine}
+`;
+
+    // ── Claude analysis ───────────────────────────────────────────────────────
     const message = await client.messages.create({
       model: "claude-sonnet-4-6",
       max_tokens: 1024,
-      messages: [{ role: "user", content: `You are an AEO expert. Analyze this business for AI agent visibility.\nBusiness: ${name}\nURL: ${url}\nCategory: ${category || "General"}\nLocation: ${location || "Not specified"}\n\nRespond ONLY with valid JSON no markdown:\n{"overallScore":<0-100>,"categories":[{"name":"Website Content Clarity","score":<0-100>},{"name":"Structured Data & Schema","score":<0-100>},{"name":"AI Platform Presence","score":<0-100>},{"name":"Review & Authority Signals","score":<0-100>},{"name":"Content Specificity","score":<0-100>}],"insights":[{"icon":"⚠️","text":"<observation>"},{"icon":"⚠️","text":"<gap>"},{"icon":"💡","text":"<opportunity>"}],"fixes":[{"priority":"critical","title":"<fix>","body":"<2 sentences>"},{"priority":"critical","title":"<fix>","body":"<explanation>"},{"priority":"high","title":"<fix>","body":"<explanation>"},{"priority":"high","title":"<fix>","body":"<explanation>"},{"priority":"medium","title":"<fix>","body":"<explanation>"}]}` }],
+      messages: [{
+        role: "user",
+        content: `You are an AEO expert. Analyze this business for AI agent visibility.
+Business: ${name}
+URL: ${url}
+Category: ${category || "General"}
+Location: ${location || "Not specified"}
+
+${signalBlock}
+
+For the "Structured Data & Schema" category score, use the schema signal above as the primary input.
+For the "AI Platform Presence" category score, use the Perplexity score above as the primary input.
+The overallScore must reflect these real measurements — do not inflate it if AI presence is low.
+
+Respond ONLY with valid JSON, no markdown:
+{"overallScore":<0-100>,"categories":[{"name":"Website Content Clarity","score":<0-100>},{"name":"Structured Data & Schema","score":<0-100>},{"name":"AI Platform Presence","score":<0-100>},{"name":"Review & Authority Signals","score":<0-100>},{"name":"Content Specificity","score":<0-100>}],"insights":[{"icon":"⚠️","text":"<observation>"},{"icon":"⚠️","text":"<gap>"},{"icon":"💡","text":"<opportunity>"}],"fixes":[{"priority":"critical","title":"<fix>","body":"<2 sentences>"},{"priority":"critical","title":"<fix>","body":"<explanation>"},{"priority":"high","title":"<fix>","body":"<explanation>"},{"priority":"high","title":"<fix>","body":"<explanation>"},{"priority":"medium","title":"<fix>","body":"<explanation>"}]}`,
+      }],
     });
-    const raw = message.content.map(b => b.text || "").join("");
+
+    const raw = message.content.map((b) => b.text || "").join("");
     const results = JSON.parse(raw.replace(/```json|```/g, "").trim());
+
+    // ── Attach real signal results to response ────────────────────────────────
+    results.signals = { perplexity, schema };
+
     const auditId = uuidv4();
-    const audit = { id: auditId, business_name: name, business_url: url, category: category || null, location: location || null, score: results.overallScore, results: JSON.stringify(results), ip_address: req.ip, created_at: new Date().toISOString() };
+    const audit = {
+      id: auditId,
+      business_name: name,
+      business_url: url,
+      category: category || null,
+      location: location || null,
+      score: results.overallScore,
+      results: JSON.stringify(results),
+      ip_address: req.ip,
+      created_at: new Date().toISOString(),
+    };
     db.get("audits").push(audit).write();
     return res.json({ auditId, shareUrl: `/results/${auditId}`, ...results });
+
   } catch (err) {
     console.error("Audit error:", err.message);
     if (err.status === 401) return res.status(500).json({ error: "Invalid API key." });
