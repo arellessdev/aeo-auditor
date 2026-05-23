@@ -103,7 +103,7 @@ async function auditBusiness(biz) {
     method:  "POST",
     headers: { "Content-Type": "application/json" },
     body,
-    signal:  AbortSignal.timeout(90_000),
+    signal:  AbortSignal.timeout(180_000),
   });
   const json = await res.json().catch(() => ({ error: `HTTP ${res.status} (non-JSON)` }));
   if (!res.ok) return { ok: false, status: res.status, error: json.error || `HTTP ${res.status}` };

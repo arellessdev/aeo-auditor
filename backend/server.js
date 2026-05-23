@@ -104,8 +104,12 @@ async function checkOpenAIWebSearchPresence(name, url, category, location) {
         `${cat} ${loc}`,
       ];
 
-  const results = await Promise.allSettled(
-    prompts.map(async (prompt) => {
+  // Sequential execution with 25 s gap to stay under 3 RPM on OpenAI
+  const promptResults = [];
+  for (let i = 0; i < prompts.length; i++) {
+    if (i > 0) await new Promise((r) => setTimeout(r, 25_000));
+    const prompt = prompts[i];
+    try {
       const res = await fetch("https://api.openai.com/v1/responses", {
         method: "POST",
         headers: {
@@ -134,23 +138,16 @@ async function checkOpenAIWebSearchPresence(name, url, category, location) {
         .join("");
       const citationDomains = extractCitationDomains(data);
       const webSearchFired = (data.output || []).some((o) => o.type === "web_search_call");
-      return { text, citationDomains, webSearchFired };
-    })
-  );
-
-  const promptResults = prompts.map((prompt, i) => {
-    const r = results[i];
-    if (r.status !== "fulfilled") {
-      console.error(`OpenAI prompt failed: ${r.reason?.message || r.reason}`);
-      return { prompt, matched: false, webSearchFired: false };
+      promptResults.push({
+        prompt,
+        matched: businessMatchesResponse(name, url, text, citationDomains),
+        webSearchFired,
+      });
+    } catch (err) {
+      console.error(`OpenAI prompt failed: ${err.message}`);
+      promptResults.push({ prompt, matched: false, webSearchFired: false });
     }
-    const { text, citationDomains, webSearchFired } = r.value;
-    return {
-      prompt,
-      matched: businessMatchesResponse(name, url, text, citationDomains),
-      webSearchFired,
-    };
-  });
+  }
 
   const matched = promptResults.filter((p) => p.matched).length;
   return {
