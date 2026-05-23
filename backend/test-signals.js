@@ -8,13 +8,49 @@ require("dotenv").config();
 
 // ─── Copy of the signal functions (identical to server.js) ──────────────────
 
+// ─── Name matching helpers ───────────────────────────────────────────────────
+function normalizeStr(str) {
+  return str.toLowerCase().replace(/['\-\.]/g, "").replace(/\s+/g, " ").trim();
+}
+
+function extractDomain(url) {
+  try {
+    const u = new URL(url.startsWith("http") ? url : `https://${url}`);
+    return u.hostname.replace(/^www\./, "");
+  } catch { return null; }
+}
+
+// Returns the condition that matched, or null.
+function businessMatchReason(name, url, text) {
+  const normText = normalizeStr(text);
+  const normName = normalizeStr(name);
+
+  if (normText.includes(normName)) return "name";
+
+  const domain = extractDomain(url);
+  if (domain && text.toLowerCase().includes(domain)) return "domain";
+
+  const words = normName.split(" ").filter(Boolean);
+  if (words.length >= 3) {
+    for (let i = 0; i < words.length - 1; i++) {
+      if (normText.includes(`${words[i]} ${words[i + 1]}`)) return "partial";
+    }
+  }
+
+  return null;
+}
+
+function businessMatchesText(name, url, text) {
+  return businessMatchReason(name, url, text) !== null;
+}
+
 const RELEVANT_SCHEMA_TYPES = [
   "LocalBusiness", "Restaurant", "FoodEstablishment", "Organization",
   "Store", "Service", "Product", "Place", "ProfessionalService",
   "HealthAndBeautyBusiness", "LodgingBusiness", "SportsActivityLocation",
 ];
 
-async function checkPerplexityPresence(name, category, location) {
+async function checkPerplexityPresence(name, url, category, location) {
   const cat = category || "business";
   const loc = location || "any area";
   const prompts = [
@@ -46,15 +82,14 @@ async function checkPerplexityPresence(name, category, location) {
     )
   );
 
-  const nameNorm = name.toLowerCase();
   const promptResults = prompts.map((prompt, i) => {
     const r = results[i];
     const text =
       r.status === "fulfilled"
         ? (r.value?.choices?.[0]?.message?.content || "")
         : "";
-    const matched = text.toLowerCase().includes(nameNorm);
-    return { prompt, matched, snippet: text.slice(0, 200) };
+    const reason = businessMatchReason(name, url, text);
+    return { prompt, matched: reason !== null, matchedBy: reason, snippet: text.slice(0, 200) };
   });
 
   const matched = promptResults.filter((p) => p.matched).length;
@@ -111,25 +146,25 @@ async function checkSchemaMarkup(url) {
 
 const TEST_CASES = [
   {
-    label: "Reef (known ChatGPT presence)",
+    label: "Reef (known AI presence)",
     name: "Reef",
     url: "https://reef.com",
     category: "footwear",
     location: "beach",
   },
   {
-    label: "Nike (global brand — should score high)",
-    name: "Nike",
-    url: "https://nike.com",
-    category: "footwear",
-    location: "US",
+    label: "Dakota's Restaurant (small local business)",
+    name: "Dakota's Restaurant",
+    url: "https://dakotasrestaurantok.com",
+    category: "restaurant",
+    location: "Blanchard OK",
   },
   {
-    label: "Fictional business (should score 0)",
-    name: "Zxqfakebiz9182",
-    url: "https://example.com",
-    category: "restaurant",
-    location: "Mars",
+    label: "Bob's Plumbing (no web presence baseline)",
+    name: "Bob's Plumbing",
+    url: "https://bobsplumbingnormanok.com",
+    category: "plumber",
+    location: "Norman OK",
   },
 ];
 
@@ -145,14 +180,15 @@ async function runTest({ label, name, url, category, location }) {
 
   // Perplexity
   console.log("\n🔍 Perplexity Presence Check...");
-  const perplexity = await checkPerplexityPresence(name, category, location)
+  const perplexity = await checkPerplexityPresence(name, url, category, location)
     .catch((err) => ({ score: null, error: err.message, prompts: [] }));
 
   if (perplexity.score !== null) {
     console.log(`   Score: ${perplexity.score}/100 (${perplexity.promptsMatched}/${perplexity.promptsTested} prompts matched)`);
     for (const p of perplexity.prompts) {
       const icon = p.matched ? "✅" : "❌";
-      console.log(`   ${icon} "${p.prompt}"`);
+      const via = p.matchedBy ? ` [via ${p.matchedBy}]` : "";
+      console.log(`   ${icon}${via} "${p.prompt}"`);
       if (p.snippet) console.log(`      ↳ ${p.snippet.replace(/\n/g, " ")}...`);
     }
   } else {

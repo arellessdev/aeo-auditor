@@ -18,8 +18,43 @@ const PORT = process.env.PORT || 3001;
 const BASE_URL = process.env.BASE_URL || `http://localhost:${PORT}`;
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
+// ─── Name matching helpers ───────────────────────────────────────────────────
+function normalizeStr(str) {
+  return str.toLowerCase().replace(/['\-\.]/g, "").replace(/\s+/g, " ").trim();
+}
+
+function extractDomain(url) {
+  try {
+    const u = new URL(url.startsWith("http") ? url : `https://${url}`);
+    return u.hostname.replace(/^www\./, "");
+  } catch { return null; }
+}
+
+// Returns true if any of three conditions hold:
+//  1. Normalized name (punctuation stripped) appears in text
+//  2. Business domain appears in text
+//  3. At least 2 consecutive words of a 3+ word name appear in text
+function businessMatchesText(name, url, text) {
+  const normText = normalizeStr(text);
+  const normName = normalizeStr(name);
+
+  if (normText.includes(normName)) return true;
+
+  const domain = extractDomain(url);
+  if (domain && text.toLowerCase().includes(domain)) return true;
+
+  const words = normName.split(" ").filter(Boolean);
+  if (words.length >= 3) {
+    for (let i = 0; i < words.length - 1; i++) {
+      if (normText.includes(`${words[i]} ${words[i + 1]}`)) return true;
+    }
+  }
+
+  return false;
+}
+
 // ─── Real signal: Perplexity AI presence ────────────────────────────────────
-async function checkPerplexityPresence(name, category, location) {
+async function checkPerplexityPresence(name, url, category, location) {
   const cat = category || "business";
   const loc = location || "any area";
   const prompts = [
@@ -46,14 +81,13 @@ async function checkPerplexityPresence(name, category, location) {
     )
   );
 
-  const nameNorm = name.toLowerCase();
   const promptResults = prompts.map((prompt, i) => {
     const r = results[i];
     const text =
       r.status === "fulfilled"
         ? (r.value?.choices?.[0]?.message?.content || "")
         : "";
-    return { prompt, matched: text.toLowerCase().includes(nameNorm) };
+    return { prompt, matched: businessMatchesText(name, url, text) };
   });
 
   const matched = promptResults.filter((p) => p.matched).length;
@@ -159,7 +193,7 @@ app.post("/api/audit", auditLimiter, async (req, res) => {
   try {
     // ── Run real signals in parallel ────────────────────────────────────────
     const [perplexity, schema] = await Promise.all([
-      checkPerplexityPresence(name, category, location)
+      checkPerplexityPresence(name, url, category, location)
         .catch((err) => ({ score: null, promptsTested: 3, promptsMatched: 0, prompts: [], error: err.message })),
       checkSchemaMarkup(url)
         .catch((err) => ({ found: false, types: [], relevantTypes: [], schemasFound: 0, hasLocalBusiness: false, error: err.message })),
