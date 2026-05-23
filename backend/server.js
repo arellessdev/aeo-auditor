@@ -62,17 +62,41 @@ function isNationalBusiness(location) {
   return loc === "national" || loc === "online" || loc === "";
 }
 
+// ─── Extract domains from OpenAI url_citation annotations ────────────────────
+function extractCitationDomains(responseBody) {
+  return (responseBody.output || [])
+    .filter((o) => o.type === "message")
+    .flatMap((o) => o.content || [])
+    .filter((c) => c.type === "output_text")
+    .flatMap((c) => c.annotations || [])
+    .filter((a) => a.type === "url_citation")
+    .map((a) => {
+      try { return new URL(a.url).hostname.replace(/^www\./, ""); }
+      catch { return null; }
+    })
+    .filter(Boolean);
+}
+
+// ─── Match against response text AND citation URLs ────────────────────────────
+function businessMatchesResponse(name, url, text, citationDomains) {
+  if (businessMatchesText(name, url, text)) return true;
+  const domain = extractDomain(url);
+  return !!domain && citationDomains.some((d) => d === domain);
+}
+
 // ─── Real signal: OpenAI web search presence ─────────────────────────────────
 async function checkOpenAIWebSearchPresence(name, url, category, location) {
   const cat = category || "business";
   const loc = location || "any area";
   const national = isNationalBusiness(location);
 
+  // National prompts are name-specific so the model must do a live lookup
+  // rather than answering from training-data brand lists.
   const prompts = national
     ? [
-        `best ${cat} brand online`,
-        `top ${cat} brands`,
-        `where to buy ${cat} online`,
+        `${name} ${cat} reviews 2024`,
+        `is ${name} a good ${cat} brand`,
+        `${name} ${cat} official website`,
       ]
     : [
         `best ${cat} in ${loc}`,
@@ -82,29 +106,50 @@ async function checkOpenAIWebSearchPresence(name, url, category, location) {
 
   const results = await Promise.allSettled(
     prompts.map(async (prompt) => {
-      const response = await openaiClient.responses.create({
-        model: "gpt-4o-mini",
-        tools: [{ type: "web_search_preview" }],
-        input: prompt,
+      const res = await fetch("https://api.openai.com/v1/responses", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "gpt-4o-mini",
+          tools: [{ type: "web_search_preview" }],
+          input: prompt,
+        }),
+        signal: AbortSignal.timeout(120_000),
       });
-      // output_text is a convenience accessor on the SDK; fall back to manual extraction
-      return (
-        response.output_text ??
-        (response.output || [])
-          .filter((o) => o.type === "message")
-          .flatMap((o) => o.content ?? [])
-          .filter((c) => c.type === "output_text")
-          .map((c) => c.text)
-          .join("") ??
-        ""
-      );
+
+      if (!res.ok) {
+        const errBody = await res.text().catch(() => "");
+        throw new Error(`OpenAI ${res.status}: ${errBody.slice(0, 200)}`);
+      }
+
+      const data = await res.json();
+      const text = (data.output || [])
+        .filter((o) => o.type === "message")
+        .flatMap((o) => o.content || [])
+        .filter((c) => c.type === "output_text")
+        .map((c) => c.text)
+        .join("");
+      const citationDomains = extractCitationDomains(data);
+      const webSearchFired = (data.output || []).some((o) => o.type === "web_search_call");
+      return { text, citationDomains, webSearchFired };
     })
   );
 
   const promptResults = prompts.map((prompt, i) => {
     const r = results[i];
-    const text = r.status === "fulfilled" ? r.value : "";
-    return { prompt, matched: businessMatchesText(name, url, text) };
+    if (r.status !== "fulfilled") {
+      console.error(`OpenAI prompt failed: ${r.reason?.message || r.reason}`);
+      return { prompt, matched: false, webSearchFired: false };
+    }
+    const { text, citationDomains, webSearchFired } = r.value;
+    return {
+      prompt,
+      matched: businessMatchesResponse(name, url, text, citationDomains),
+      webSearchFired,
+    };
   });
 
   const matched = promptResults.filter((p) => p.matched).length;
@@ -114,6 +159,7 @@ async function checkOpenAIWebSearchPresence(name, url, category, location) {
     promptsMatched: matched,
     prompts: promptResults,
     queryType: national ? "national" : "local",
+    webSearchFired: promptResults.some((p) => p.webSearchFired),
   };
 }
 
