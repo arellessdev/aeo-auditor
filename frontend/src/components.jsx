@@ -121,7 +121,7 @@ export function AuditResults({ results, auditId, businessName, location, onReset
           <div style={{ fontSize: "15px", fontFamily: "'DM Sans', sans-serif", fontWeight: "600", marginBottom: "4px" }}>Want us to fix this for you?</div>
           <div style={{ fontSize: "13px", color: C.textDim, fontFamily: "'DM Sans', sans-serif" }}>Full implementation, monthly monitoring, and competitor tracking.</div>
         </div>
-        <button style={{ background: C.accent, color: C.bg, border: "none", borderRadius: "8px", padding: "16px 32px", fontSize: "13px", fontWeight: "700", letterSpacing: "2px", textTransform: "uppercase", cursor: "pointer", fontFamily: "'DM Mono', monospace" }}>Get Full Report ?</button>
+        <Link to="/pricing" style={{ display: "inline-block", background: C.accent, color: C.bg, border: "none", borderRadius: "8px", padding: "16px 32px", fontSize: "13px", fontWeight: "700", letterSpacing: "2px", textTransform: "uppercase", cursor: "pointer", fontFamily: "'DM Mono', monospace", textDecoration: "none" }}>Get Full Report</Link>
       </div>
     </div>
   );

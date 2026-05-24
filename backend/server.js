@@ -85,13 +85,66 @@ function businessMatchesResponse(name, url, text, citationDomains) {
 }
 
 // ─── Real signal: OpenAI web search presence ─────────────────────────────────
+
+// Single OpenAI web-search call; attaches .status to thrown errors for
+// rate-limit detection by the caller.
+async function callOpenAI(prompt, timeoutMs = 30_000) {
+  const res = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "gpt-4o-mini",
+      tools: [{ type: "web_search_preview" }],
+      input: prompt,
+    }),
+    signal: AbortSignal.timeout(timeoutMs),
+  });
+
+  if (!res.ok) {
+    const errBody = await res.text().catch(() => "");
+    const err = new Error(`OpenAI ${res.status}: ${errBody.slice(0, 200)}`);
+    err.status = res.status;
+    throw err;
+  }
+
+  const data = await res.json();
+  const text = (data.output || [])
+    .filter((o) => o.type === "message")
+    .flatMap((o) => o.content || [])
+    .filter((c) => c.type === "output_text")
+    .map((c) => c.text)
+    .join("");
+  const citationDomains = extractCitationDomains(data);
+  const webSearchFired = (data.output || []).some((o) => o.type === "web_search_call");
+  return { text, citationDomains, webSearchFired };
+}
+
+function buildPromptResult(prompt, name, url, result) {
+  return {
+    prompt,
+    matched: businessMatchesResponse(name, url, result.text, result.citationDomains),
+    webSearchFired: result.webSearchFired,
+  };
+}
+
+function summarise(promptResults, totalPrompts) {
+  const matched = promptResults.filter((p) => p.matched).length;
+  return {
+    score: Math.round((matched / totalPrompts) * 100),
+    promptsTested: totalPrompts,
+    promptsMatched: matched,
+    prompts: promptResults,
+  };
+}
+
 async function checkOpenAIWebSearchPresence(name, url, category, location) {
   const cat = category || "business";
   const loc = location || "any area";
   const national = isNationalBusiness(location);
 
-  // National prompts are name-specific so the model must do a live lookup
-  // rather than answering from training-data brand lists.
   const prompts = national
     ? [
         `${name} ${cat} reviews 2024`,
@@ -104,57 +157,47 @@ async function checkOpenAIWebSearchPresence(name, url, category, location) {
         `${cat} ${loc}`,
       ];
 
-  // Sequential execution with 25 s gap to stay under 3 RPM on OpenAI
-  const promptResults = [];
-  for (let i = 0; i < prompts.length; i++) {
-    if (i > 0) await new Promise((r) => setTimeout(r, 25_000));
-    const prompt = prompts[i];
-    try {
-      const res = await fetch("https://api.openai.com/v1/responses", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "gpt-4o-mini",
-          tools: [{ type: "web_search_preview" }],
-          input: prompt,
-        }),
-        signal: AbortSignal.timeout(120_000),
-      });
+  // ── Attempt 1: all 3 prompts in parallel ─────────────────────────────────
+  const parallelRaw = await Promise.allSettled(prompts.map((p) => callOpenAI(p, 30_000)));
 
-      if (!res.ok) {
-        const errBody = await res.text().catch(() => "");
-        throw new Error(`OpenAI ${res.status}: ${errBody.slice(0, 200)}`);
+  const rateLimited = parallelRaw.some(
+    (r) => r.status === "rejected" && r.reason?.status === 429
+  );
+
+  if (!rateLimited) {
+    // Happy path — map settled results directly
+    const promptResults = prompts.map((prompt, i) => {
+      const r = parallelRaw[i];
+      if (r.status !== "fulfilled") {
+        console.error(`OpenAI prompt failed: ${r.reason?.message || r.reason}`);
+        return { prompt, matched: false, webSearchFired: false };
       }
+      return buildPromptResult(prompt, name, url, r.value);
+    });
+    return {
+      ...summarise(promptResults, prompts.length),
+      queryType: national ? "national" : "local",
+      webSearchFired: promptResults.some((p) => p.webSearchFired),
+    };
+  }
 
-      const data = await res.json();
-      const text = (data.output || [])
-        .filter((o) => o.type === "message")
-        .flatMap((o) => o.content || [])
-        .filter((c) => c.type === "output_text")
-        .map((c) => c.text)
-        .join("");
-      const citationDomains = extractCitationDomains(data);
-      const webSearchFired = (data.output || []).some((o) => o.type === "web_search_call");
-      promptResults.push({
-        prompt,
-        matched: businessMatchesResponse(name, url, text, citationDomains),
-        webSearchFired,
-      });
+  // ── Attempt 2: rate-limited fallback — 2 prompts, 10 s apart ─────────────
+  console.warn("OpenAI rate-limited on parallel attempt; falling back to 2 prompts + 10 s delay");
+  const fallbackPrompts = prompts.slice(0, 2);
+  const promptResults = [];
+  for (let i = 0; i < fallbackPrompts.length; i++) {
+    if (i > 0) await new Promise((r) => setTimeout(r, 10_000));
+    const prompt = fallbackPrompts[i];
+    try {
+      const result = await callOpenAI(prompt, 45_000);
+      promptResults.push(buildPromptResult(prompt, name, url, result));
     } catch (err) {
-      console.error(`OpenAI prompt failed: ${err.message}`);
+      console.error(`OpenAI fallback prompt failed: ${err.message}`);
       promptResults.push({ prompt, matched: false, webSearchFired: false });
     }
   }
-
-  const matched = promptResults.filter((p) => p.matched).length;
   return {
-    score: Math.round((matched / prompts.length) * 100),
-    promptsTested: prompts.length,
-    promptsMatched: matched,
-    prompts: promptResults,
+    ...summarise(promptResults, fallbackPrompts.length),
     queryType: national ? "national" : "local",
     webSearchFired: promptResults.some((p) => p.webSearchFired),
   };
