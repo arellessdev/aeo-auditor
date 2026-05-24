@@ -75,7 +75,7 @@ const FAQ = [
   },
   {
     q: "What counts as an 'AI recommendation'?",
-    a: "When someone asks ChatGPT, Claude, or Perplexity 'best dentist in Austin' or 'recommend a plumber near me', the model searches the web and surfaces specific businesses. We measure whether yours shows up in those responses.",
+    a: "When someone asks ChatGPT, Claude, Perplexity, and similar AI search platforms 'best dentist in Austin' or 'recommend a plumber near me', the model searches the web and surfaces specific businesses. We measure whether yours shows up in those responses.",
   },
   {
     q: "Can I cancel my subscription any time?",
@@ -208,8 +208,13 @@ function TierCard({ tier }) {
       </div>
 
       {/* Description */}
-      <p style={{ fontSize: "13px", color: C.textDim, lineHeight: "1.6", fontFamily: "'DM Sans', sans-serif", marginBottom: "28px", minHeight: "52px" }}>
+      <p style={{ fontSize: "13px", color: C.textDim, lineHeight: "1.6", fontFamily: "'DM Sans', sans-serif", marginBottom: "10px", minHeight: "52px" }}>
         {tier.description}
+      </p>
+
+      {/* Platform line */}
+      <p style={{ fontSize: "11px", color: C.muted, fontFamily: "'DM Sans', sans-serif", marginBottom: "28px", letterSpacing: "0.3px" }}>
+        Tested against ChatGPT · Claude · Perplexity · and more
       </p>
 
       {/* CTA */}
