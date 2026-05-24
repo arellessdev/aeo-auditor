@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1270 760" width="1270" height="760">
+  <defs>
+    <style>@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;700&amp;family=DM+Sans:wght@400;600;700&amp;display=swap');</style>
+    <filter id="dot-glow" x="-200%" y="-200%" width="500%" height="500%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="btn-glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="8" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1a2540" stroke-width="0.5"/>
+    </pattern>
+  </defs>
+  <rect width="1270" height="760" fill="#080c14"/>
+  <rect width="1270" height="760" fill="url(#grid)" opacity="0.55"/>
+  <!-- ambient hero glow -->
+  <ellipse cx="635" cy="360" rx="420" ry="220" fill="#00e5ff" opacity="0.025"/>
+  <!-- Header -->
+  <rect x="0" y="0" width="1270" height="64" fill="#0d1420"/>
+  <line x1="0" y1="64" x2="1270" y2="64" stroke="#1a2540" stroke-width="1"/>
+  <!-- logo bars -->
+  <rect x="40" y="29" width="5"   height="8"  rx="1.5" fill="#1e3346"/>
+  <rect x="47" y="23" width="5"   height="14" rx="1.5" fill="#007fa0"/>
+  <rect x="54" y="16" width="5"   height="21" rx="1.5" fill="#00e5ff" filter="url(#dot-glow)"/>
+  <text x="67" y="40" font-family="'DM Mono','Courier New',Courier,monospace" font-size="14" font-weight="700">
+    <tspan fill="#00e5ff">AI</tspan><tspan fill="#ccd8f8">Scorify</tspan>
+  </text>
+  <!-- nav -->
+  <text x="1042" y="37" font-family="'DM Mono','Courier New',Courier,monospace" font-size="11" fill="#7a8aa8" letter-spacing="2">PRICING</text>
+  <rect x="1118" y="20" width="112" height="28" rx="6" fill="#00e5ff"/>
+  <text x="1174" y="38" font-family="'DM Mono','Courier New',Courier,monospace" font-size="10" font-weight="700" fill="#080c14" letter-spacing="1.5" text-anchor="middle">FREE AUDIT</text>
+  <!-- Hero overline -->
+  <text x="635" y="175" font-family="'DM Mono','Courier New',Courier,monospace" font-size="11" fill="#00e5ff" letter-spacing="4" text-anchor="middle">AI SEARCH VISIBILITY</text>
+  <!-- Headline -->
+  <text x="635" y="250" font-family="'DM Sans',Arial,sans-serif" font-size="58" font-weight="700" fill="#e0e8ff" letter-spacing="-1.5" text-anchor="middle">Is AI recommending</text>
+  <text x="635" y="320" font-family="'DM Sans',Arial,sans-serif" font-size="58" font-weight="700" fill="#e0e8ff" letter-spacing="-1.5" text-anchor="middle">your business?</text>
+  <!-- Subtitle -->
+  <text x="635" y="372" font-family="'DM Sans',Arial,sans-serif" font-size="17" fill="#7a8aa8" text-anchor="middle">Find out in 20 seconds — free, no sign-up required.</text>
+  <!-- Form: business name input -->
+  <rect x="192" y="415" width="390" height="52" rx="8" fill="#0d1420" stroke="#1a2540" stroke-width="1"/>
+  <text x="214" y="437" font-family="'DM Sans',Arial,sans-serif" font-size="10" fill="#4a5a7a" letter-spacing="0.5">BUSINESS NAME</text>
+  <text x="214" y="456" font-family="'DM Sans',Arial,sans-serif" font-size="14" fill="#7a8aa8">e.g. Joe's Pizza NYC</text>
+  <!-- city/state input -->
+  <rect x="598" y="415" width="260" height="52" rx="8" fill="#0d1420" stroke="#1a2540" stroke-width="1"/>
+  <text x="618" y="437" font-family="'DM Sans',Arial,sans-serif" font-size="10" fill="#4a5a7a" letter-spacing="0.5">CITY, STATE</text>
+  <text x="618" y="456" font-family="'DM Sans',Arial,sans-serif" font-size="14" fill="#7a8aa8">Austin, TX</text>
+  <!-- run audit button -->
+  <rect x="874" y="415" width="204" height="52" rx="8" fill="#00e5ff" filter="url(#btn-glow)" opacity="0.3"/>
+  <rect x="874" y="415" width="204" height="52" rx="8" fill="#00e5ff"/>
+  <text x="976" y="447" font-family="'DM Mono','Courier New',Courier,monospace" font-size="11" font-weight="700" fill="#080c14" letter-spacing="2" text-anchor="middle">RUN FREE AUDIT</text>
+  <!-- Trust line -->
+  <text x="635" y="506" font-family="'DM Mono','Courier New',Courier,monospace" font-size="11" fill="#3a4a6a" text-anchor="middle">Tested against ChatGPT  ·  Perplexity  ·  Claude  ·  and more</text>
+  <!-- Bottom score teaser row -->
+  <rect x="205" y="570" width="860" height="72" rx="10" fill="#0d1420" stroke="#1a2540" stroke-width="1"/>
+  <text x="260" y="596" font-family="'DM Mono','Courier New',Courier,monospace" font-size="9" fill="#4a5a7a" letter-spacing="2">CHATGPT</text>
+  <rect x="260" y="604" width="100" height="3" rx="1.5" fill="#1a2540"/>
+  <rect x="260" y="604" width="72" height="3" rx="1.5" fill="#00e5ff" opacity="0.7"/>
+  <text x="430" y="596" font-family="'DM Mono','Courier New',Courier,monospace" font-size="9" fill="#4a5a7a" letter-spacing="2">PERPLEXITY</text>
+  <rect x="430" y="604" width="100" height="3" rx="1.5" fill="#1a2540"/>
+  <rect x="430" y="604" width="38" height="3" rx="1.5" fill="#00e5ff" opacity="0.7"/>
+  <text x="600" y="596" font-family="'DM Mono','Courier New',Courier,monospace" font-size="9" fill="#4a5a7a" letter-spacing="2">CLAUDE</text>
+  <rect x="600" y="604" width="100" height="3" rx="1.5" fill="#1a2540"/>
+  <rect x="600" y="604" width="80" height="3" rx="1.5" fill="#00e5ff" opacity="0.7"/>
+  <text x="770" y="596" font-family="'DM Mono','Courier New',Courier,monospace" font-size="9" fill="#4a5a7a" letter-spacing="2">SCHEMA</text>
+  <rect x="770" y="604" width="100" height="3" rx="1.5" fill="#1a2540"/>
+  <rect x="770" y="604" width="22" height="3" rx="1.5" fill="#ff4757" opacity="0.7"/>
+  <text x="940" y="596" font-family="'DM Mono','Courier New',Courier,monospace" font-size="9" fill="#4a5a7a" letter-spacing="2">OVERALL SCORE</text>
+  <rect x="940" y="604" width="100" height="3" rx="1.5" fill="#1a2540"/>
+  <rect x="940" y="604" width="52" height="3" rx="1.5" fill="#ffd60a" opacity="0.9"/>
+  <!-- labels -->
+  <text x="260" y="624" font-family="'DM Sans',Arial,sans-serif" font-size="11" fill="#3a4a6a">72%</text>
+  <text x="430" y="624" font-family="'DM Sans',Arial,sans-serif" font-size="11" fill="#3a4a6a">38%</text>
+  <text x="600" y="624" font-family="'DM Sans',Arial,sans-serif" font-size="11" fill="#3a4a6a">80%</text>
+  <text x="770" y="624" font-family="'DM Sans',Arial,sans-serif" font-size="11" fill="#3a4a6a">22%</text>
+  <text x="940" y="624" font-family="'DM Sans',Arial,sans-serif" font-size="11" fill="#3a4a6a">53 / 100</text>
+</svg>

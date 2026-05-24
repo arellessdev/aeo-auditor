@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 118 30" role="img" aria-label="AIScorify">
+  <title>AIScorify</title>
+  <defs>
+    <filter id="glow" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="2.5" result="b"/>
+      <feMerge>
+        <feMergeNode in="b"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <!-- Rising signal bars -->
+  <rect x="0"   y="18" width="5.5" height="10" rx="1.5" fill="#1e3346"/>
+  <rect x="7.5" y="11" width="5.5" height="17" rx="1.5" fill="#007fa0"/>
+  <rect x="15"  y="3"  width="5.5" height="25" rx="1.5" fill="#00e5ff" filter="url(#glow)"/>
+  <!-- Wordmark -->
+  <text x="28" y="22" font-family="'DM Mono','Courier New',Courier,monospace" font-size="15.5" font-weight="700" letter-spacing="0.4">
+    <tspan fill="#00e5ff">AI</tspan><tspan fill="#ccd8f8">Scorify</tspan>
+  </text>
+</svg>

@@ -13,10 +13,9 @@ export const scoreLabel = (s) => s >= 75 ? "Strong Visibility" : s >= 50 ? "Mode
 export function Header() {
   return (
     <div style={{ borderBottom: `1px solid ${C.border}`, padding: "20px 40px", display: "flex", alignItems: "center", justifyContent: "space-between", background: C.surface }}>
-      <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-        <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: C.accent, boxShadow: `0 0 10px ${C.accent}`, animation: "pulse 2s infinite" }} />
-        <a href="/" style={{ fontSize: "13px", letterSpacing: "4px", color: C.accent, fontWeight: "700", textTransform: "uppercase", fontFamily: "'DM Mono', monospace", textDecoration: "none" }}>AIScorify</a>
-      </div>
+      <a href="/" style={{ display: "flex", alignItems: "center", textDecoration: "none" }}>
+        <img src="/logo.svg" alt="AIScorify" style={{ height: "32px", display: "block" }} />
+      </a>
       <nav style={{ display: "flex", alignItems: "center", gap: "28px" }}>
         <Link to="/pricing" style={{ fontSize: "12px", letterSpacing: "2px", color: C.textDim, textTransform: "uppercase", fontFamily: "'DM Mono', monospace", textDecoration: "none" }}>Pricing</Link>
         <Link to="/" style={{ background: C.accent, color: C.bg, borderRadius: "6px", padding: "8px 18px", fontSize: "11px", fontWeight: "700", letterSpacing: "2px", textTransform: "uppercase", fontFamily: "'DM Mono', monospace", textDecoration: "none" }}>Free Audit</Link>
