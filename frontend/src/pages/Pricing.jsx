@@ -3,7 +3,7 @@ import { C, Header } from "../components";
 
 const TIERS = [
   {
-    name: "Starter",
+    name: "Free",
     price: "Free",
     period: null,
     description: "Get your baseline AI Search Visibility Score. No card required.",
@@ -11,58 +11,82 @@ const TIERS = [
     ctaHref: "/",
     featured: false,
     features: [
-      "1 audit per day",
-      "AI presence score (ChatGPT, Claude, Perplexity)",
-      "Schema markup detection",
-      "Prioritized fix recommendations",
-      "Shareable results link",
+      "Overall AI visibility score",
+      "Category breakdown with scores",
+      "Top 1 critical fix recommendation",
+      "Instant results in under 20 seconds",
     ],
     missing: [
-      "Monthly re-scoring",
-      "Competitor comparison",
-      "Email alerts",
-      "Multi-location support",
+      "All fix recommendations",
+      "Key findings breakdown",
+      "AI platform response details",
+      "Schema markup code",
+      "Competitor data",
+    ],
+  },
+  {
+    name: "Starter",
+    price: "$29",
+    period: "/mo",
+    description: "Get all your fix recommendations and a full breakdown of what's holding you back.",
+    cta: "Start Starter",
+    ctaHref: "#",
+    featured: false,
+    features: [
+      "Everything in Free",
+      "All fix recommendations with priority levels",
+      "Full key findings breakdown",
+      "Shareable results link",
+      "Unlimited audits",
+    ],
+    missing: [
+      "AI platform response details",
+      "Schema markup code",
+      "Competitor data",
+      "PDF export",
     ],
   },
   {
     name: "Pro",
     price: "$49",
     period: "/mo",
-    description: "Track your AI visibility over time and stay ahead of competitors.",
+    description: "See exactly what ChatGPT, Perplexity, and Claude say about your business.",
     cta: "Start Pro Trial",
     ctaHref: "#",
     featured: true,
     badge: "Most Popular",
     features: [
-      "Unlimited audits",
+      "Everything in Starter",
+      "1 ChatGPT query with response snippet",
+      "1 Perplexity query with response snippet",
+      "1 Claude query with response snippet",
+      "Schema markup details + copy-paste JSON-LD",
       "Monthly automated re-scoring",
-      "Competitor comparison (up to 5)",
       "Email alerts when your score drops",
-      "Full prompt-level audit breakdown",
-      "Priority support",
     ],
     missing: [
-      "Multi-location support",
-      "White-label reporting",
-      "API access",
+      "All 3 queries per platform",
+      "Competitor tracking",
+      "PDF export",
     ],
   },
   {
     name: "Agency",
     price: "$199",
     period: "/mo",
-    description: "Manage AI visibility for all your clients from one dashboard.",
+    description: "Full AI query data, competitor tracking, and white-label reports for your clients.",
     cta: "Contact Sales",
     ctaHref: "mailto:hello@aiscorify.com",
     featured: false,
     features: [
       "Everything in Pro",
+      "All 3 ChatGPT queries with full responses",
+      "All 3 Perplexity queries with full responses",
+      "All 3 Claude queries with full responses",
+      "Top 3 competitors that appear instead of you",
+      "PDF export for client reports",
       "Up to 50 business profiles",
-      "Multi-location support",
-      "White-label PDF reports",
-      "API access",
       "Dedicated account manager",
-      "Custom integrations on request",
     ],
     missing: [],
   },
@@ -71,7 +95,11 @@ const TIERS = [
 const FAQ = [
   {
     q: "How is the AI Search Visibility Score calculated?",
-    a: "We run your business against real ChatGPT web-search queries in your category and location, check for structured data schema markup, and analyze other authority signals. The score reflects how likely you are to appear in AI-generated recommendations today.",
+    a: "We run your business against real ChatGPT, Perplexity, and Claude web-search queries in your category and location, check for structured data schema markup, and analyze other authority signals. The score reflects how likely you are to appear in AI-generated recommendations today.",
+  },
+  {
+    q: "What's the difference between Starter and Pro?",
+    a: "Starter gives you all your fix recommendations and key findings so you know exactly what to improve. Pro goes further — it shows you the actual AI responses, so you can see what ChatGPT, Perplexity, and Claude say (or don't say) about your business when someone searches for your category.",
   },
   {
     q: "What counts as an 'AI recommendation'?",
@@ -79,7 +107,7 @@ const FAQ = [
   },
   {
     q: "Can I cancel my subscription any time?",
-    a: "Yes — Pro and Agency plans are month-to-month with no lock-in. Cancel from your dashboard and you keep access until the end of your billing period.",
+    a: "Yes — all plans are month-to-month with no lock-in. Cancel from your dashboard and you keep access until the end of your billing period.",
   },
   {
     q: "Do you offer discounts for annual billing?",
@@ -92,7 +120,7 @@ export default function Pricing() {
     <div style={{ minHeight: "100vh", background: C.bg, fontFamily: "'DM Mono', monospace" }}>
       <Header />
 
-      <div style={{ maxWidth: "1040px", margin: "0 auto", padding: "60px 40px 100px" }}>
+      <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "60px 40px 100px" }}>
 
         {/* ── Hero ── */}
         <div style={{ textAlign: "center", marginBottom: "64px", animation: "fadeIn 0.4s ease" }}>
@@ -103,12 +131,12 @@ export default function Pricing() {
             Know exactly where you stand<br />with AI search engines
           </h1>
           <p style={{ fontSize: "16px", color: C.textDim, lineHeight: "1.6", maxWidth: "520px", margin: "0 auto", fontFamily: "'DM Sans', sans-serif" }}>
-            Start free. Upgrade when you're ready to monitor, compete, and grow your AI visibility over time.
+            Start free. Upgrade when you're ready to see what AI actually says about your business.
           </p>
         </div>
 
         {/* ── Tier cards ── */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "24px", marginBottom: "80px", alignItems: "start" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "20px", marginBottom: "80px", alignItems: "start" }}>
           {TIERS.map((tier) => (
             <TierCard key={tier.name} tier={tier} />
           ))}
@@ -153,10 +181,9 @@ function TierCard({ tier }) {
     background: tier.featured ? "rgba(0,229,255,0.04)" : C.surface,
     border: `1px solid ${tier.featured ? C.accent : C.border}`,
     borderRadius: "12px",
-    padding: "32px 28px",
+    padding: "28px 24px",
     display: "flex",
     flexDirection: "column",
-    gap: "0",
     position: "relative",
     boxShadow: tier.featured ? `0 0 32px rgba(0,229,255,0.08)` : "none",
   };
@@ -166,9 +193,9 @@ function TierCard({ tier }) {
     textAlign: "center",
     width: "100%",
     boxSizing: "border-box",
-    padding: "13px 0",
+    padding: "12px 0",
     borderRadius: "8px",
-    fontSize: "12px",
+    fontSize: "11px",
     fontWeight: "700",
     letterSpacing: "2px",
     textTransform: "uppercase",
@@ -178,67 +205,58 @@ function TierCard({ tier }) {
     border: tier.featured ? "none" : `1px solid ${C.border}`,
     background: tier.featured ? C.accent : "transparent",
     color: tier.featured ? C.bg : C.textDim,
-    transition: "opacity 0.15s",
   };
 
   return (
     <div style={cardStyle}>
-      {/* Badge */}
       {tier.badge && (
         <div style={{ position: "absolute", top: "-13px", left: "50%", transform: "translateX(-50%)", background: C.accent, color: C.bg, fontSize: "10px", fontWeight: "700", letterSpacing: "2px", textTransform: "uppercase", padding: "4px 14px", borderRadius: "20px", whiteSpace: "nowrap" }}>
           {tier.badge}
         </div>
       )}
 
-      {/* Tier name */}
-      <div style={{ fontSize: "11px", letterSpacing: "3px", color: tier.featured ? C.accent : C.textDim, textTransform: "uppercase", marginBottom: "20px" }}>
+      <div style={{ fontSize: "11px", letterSpacing: "3px", color: tier.featured ? C.accent : C.textDim, textTransform: "uppercase", marginBottom: "16px" }}>
         {tier.name}
       </div>
 
-      {/* Price */}
-      <div style={{ display: "flex", alignItems: "flex-end", gap: "4px", marginBottom: "12px" }}>
-        <span style={{ fontSize: tier.price === "Free" ? "42px" : "48px", fontWeight: "700", lineHeight: "1", color: C.text, fontFamily: "'DM Sans', sans-serif" }}>
+      <div style={{ display: "flex", alignItems: "flex-end", gap: "3px", marginBottom: "10px" }}>
+        <span style={{ fontSize: tier.price === "Free" ? "38px" : "42px", fontWeight: "700", lineHeight: "1", color: C.text, fontFamily: "'DM Sans', sans-serif" }}>
           {tier.price}
         </span>
         {tier.period && (
-          <span style={{ fontSize: "15px", color: C.textDim, marginBottom: "8px", fontFamily: "'DM Sans', sans-serif" }}>
+          <span style={{ fontSize: "14px", color: C.textDim, marginBottom: "6px", fontFamily: "'DM Sans', sans-serif" }}>
             {tier.period}
           </span>
         )}
       </div>
 
-      {/* Description */}
-      <p style={{ fontSize: "13px", color: C.textDim, lineHeight: "1.6", fontFamily: "'DM Sans', sans-serif", marginBottom: "10px", minHeight: "52px" }}>
+      <p style={{ fontSize: "12px", color: C.textDim, lineHeight: "1.6", fontFamily: "'DM Sans', sans-serif", marginBottom: "10px", minHeight: "48px" }}>
         {tier.description}
       </p>
 
-      {/* Platform line */}
-      <p style={{ fontSize: "11px", color: C.muted, fontFamily: "'DM Sans', sans-serif", marginBottom: "28px", letterSpacing: "0.3px" }}>
+      <p style={{ fontSize: "10px", color: C.muted, fontFamily: "'DM Sans', sans-serif", marginBottom: "20px", letterSpacing: "0.3px" }}>
         Tested against ChatGPT · Claude · Perplexity · and more
       </p>
 
-      {/* CTA */}
       {isAnchor ? (
         <a href={tier.ctaHref} style={btnStyle}>{tier.cta}</a>
       ) : (
         <Link to={tier.ctaHref} style={btnStyle}>{tier.cta}</Link>
       )}
 
-      {/* Divider */}
-      <div style={{ borderTop: `1px solid ${C.border}`, margin: "28px 0" }} />
+      <div style={{ borderTop: `1px solid ${C.border}`, margin: "24px 0" }} />
 
-      {/* Included features */}
-      <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
         {tier.features.map((f, i) => (
-          <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}>
-            <span style={{ color: C.green, fontSize: "13px", flexShrink: 0, marginTop: "1px" }}>✓</span>
-            <span style={{ fontSize: "13px", color: C.text, lineHeight: "1.5", fontFamily: "'DM Sans', sans-serif" }}>{f}</span>
+          <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: "8px" }}>
+            <span style={{ color: C.green, fontSize: "12px", flexShrink: 0, marginTop: "1px" }}>✓</span>
+            <span style={{ fontSize: "12px", color: C.text, lineHeight: "1.5", fontFamily: "'DM Sans', sans-serif" }}>{f}</span>
           </div>
         ))}
         {tier.missing.map((f, i) => (
-          <div key={`x-${i}`} style={{ display: "flex", alignItems: "flex-start", gap: "10px", opacity: 0.35 }}>
-            <span style={{ color: C.muted, fontSize: "13px", flexShrink: 0, marginTop: "1px" }}>—</span>
-            <span style={{ fontSize: "13px", color: C.textDim, lineHeight: "1.5", fontFamily: "'DM Sans', sans-serif" }}>{f}</span>
+          <div key={`x-${i}`} style={{ display: "flex", alignItems: "flex-start", gap: "8px", opacity: 0.3 }}>
+            <span style={{ color: C.muted, fontSize: "12px", flexShrink: 0, marginTop: "1px" }}>—</span>
+            <span style={{ fontSize: "12px", color: C.textDim, lineHeight: "1.5", fontFamily: "'DM Sans', sans-serif" }}>{f}</span>
           </div>
         ))}
       </div>
@@ -248,7 +266,7 @@ function TierCard({ tier }) {
 
 function FAQItem({ q, a }) {
   return (
-    <details style={{ borderBottom: `1px solid ${C.border}`, padding: "20px 0", cursor: "pointer", listStyle: "none" }}>
+    <details style={{ borderBottom: `1px solid ${C.border}`, padding: "20px 0", cursor: "pointer" }}>
       <summary style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "14px", fontFamily: "'DM Sans', sans-serif", fontWeight: "600", color: C.text, userSelect: "none", outline: "none", listStyle: "none" }}>
         {q}
         <span style={{ color: C.accent, fontSize: "18px", flexShrink: 0, marginLeft: "16px", fontFamily: "system-ui" }}>+</span>

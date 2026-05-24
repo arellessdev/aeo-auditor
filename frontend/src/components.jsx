@@ -80,52 +80,261 @@ export function ShareRow({ auditId }) {
   );
 }
 
-export function AuditResults({ results, auditId, businessName, location, onReset }) {
+function TierBanner({ tier, color, message }) {
   return (
-    <div style={{ animation: "fadeIn 0.5s ease" }}>
-      {onReset && (
-        <div style={{ display: "flex", gap: "12px", marginBottom: "32px" }}>
-          <button onClick={onReset} style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.textDim, borderRadius: "8px", padding: "10px 20px", fontSize: "12px", letterSpacing: "1.5px", textTransform: "uppercase", cursor: "pointer", fontFamily: "'DM Mono', monospace" }}>? New Audit</button>
-          {auditId && <Link to={`/report/${auditId}`} style={{ display: "inline-flex", alignItems: "center", background: "transparent", border: `1px solid ${C.accent}`, color: C.accent, borderRadius: "8px", padding: "10px 20px", fontSize: "12px", letterSpacing: "1.5px", textTransform: "uppercase", cursor: "pointer", fontFamily: "'DM Mono', monospace", textDecoration: "none" }}>Full Report</Link>}
+    <div style={{
+      display: "flex", alignItems: "center", justifyContent: "space-between",
+      background: `rgba(${color === C.yellow ? "255,214,10" : color === C.accent ? "0,229,255" : "167,139,250"}, 0.06)`,
+      border: `1px solid rgba(${color === C.yellow ? "255,214,10" : color === C.accent ? "0,229,255" : "167,139,250"}, 0.2)`,
+      borderRadius: "8px", padding: "10px 16px", marginBottom: "20px",
+    }}>
+      <span style={{ fontSize: "11px", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "2px", color, fontWeight: "700" }}>
+        ★ {tier} PREVIEW
+      </span>
+      <span style={{ fontSize: "13px", fontFamily: "'DM Sans', sans-serif", color: C.textDim }}>{message}</span>
+    </div>
+  );
+}
+
+function QueryCard({ platform, query, matched, snippet, error }) {
+  if (query == null && !error) {
+    return (
+      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "12px", padding: "28px", marginBottom: "20px" }}>
+        <div style={{ fontSize: "11px", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", color: C.textDim, marginBottom: "12px" }}>{platform}</div>
+        <div style={{ fontSize: "13px", color: C.muted, fontFamily: "'DM Sans', sans-serif" }}>Data not available — run a new audit to collect this signal</div>
+      </div>
+    );
+  }
+  return (
+    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "12px", padding: "28px", marginBottom: "20px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
+        <span style={{ fontSize: "11px", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", color: C.textDim }}>{platform}</span>
+        {!error && (
+          <span style={{
+            fontSize: "10px", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "1px", fontWeight: "700",
+            padding: "3px 10px", borderRadius: "999px",
+            background: matched ? "rgba(0,255,136,0.12)" : "rgba(255,71,87,0.12)",
+            color: matched ? C.green : C.red,
+            border: `1px solid ${matched ? "rgba(0,255,136,0.3)" : "rgba(255,71,87,0.3)"}`,
+          }}>{matched ? "FOUND" : "NOT FOUND"}</span>
+        )}
+      </div>
+      {query && (
+        <div style={{ background: C.bg, borderRadius: "6px", padding: "10px 14px", marginBottom: "14px", fontSize: "13px", fontFamily: "'DM Mono', monospace", color: C.accent, border: `1px solid ${C.border}` }}>
+          {query}
         </div>
       )}
-      <div style={{ display: "inline-flex", alignItems: "center", gap: "8px", background: C.accentDim, border: `1px solid rgba(0,229,255,0.2)`, borderRadius: "6px", padding: "6px 12px", fontSize: "12px", color: C.accent, marginBottom: "20px" }}>
-        <span style={{ opacity: 0.6 }}>audited</span>{businessName}
-        {location && <><span style={{ opacity: 0.4 }}>·</span>{location}</>}
+      {snippet && !error && (
+        <div style={{ fontSize: "13px", fontFamily: "'DM Sans', sans-serif", color: C.textDim, lineHeight: "1.65" }}>
+          {snippet.length > 400 ? snippet.slice(0, 400) + "…" : snippet}
+        </div>
+      )}
+      {error && (
+        <div style={{ fontSize: "12px", fontFamily: "'DM Sans', sans-serif", color: C.red }}>{error}</div>
+      )}
+    </div>
+  );
+}
+
+export function AuditResults({ results, auditId, businessName, location, onReset }) {
+  const fixes = results?.fixes ?? [];
+  const topFix = fixes.find((f) => f.priority === "critical") ?? fixes[0] ?? null;
+  const remainingCount = topFix ? fixes.length - 1 : fixes.length;
+
+  const aiS = results?.signals?.aiSearch;
+  const plx = results?.signals?.perplexity;
+  const cld = results?.signals?.claude;
+  const schema = results?.signals?.schema;
+  const firstPrompt = aiS?.prompts?.[0];
+
+  const cardStyle = {
+    background: C.surface,
+    border: `1px solid ${C.border}`,
+    borderRadius: "12px",
+    padding: "28px",
+    marginBottom: "20px",
+  };
+
+  const sectionHeader = (label) => (
+    <div style={{ fontSize: "11px", letterSpacing: "3px", textTransform: "uppercase", color: C.accent, marginBottom: "20px", fontFamily: "'DM Mono', monospace" }}>
+      {label}
+    </div>
+  );
+
+  const fixRow = (fix, i, arr) => (
+    <div key={i} style={{ borderBottom: i === arr.length - 1 ? "none" : `1px solid ${C.border}`, padding: "16px 0", display: "flex", gap: "16px", alignItems: "flex-start" }}>
+      <PriorityBadge p={fix.priority} />
+      <div>
+        <div style={{ fontSize: "14px", fontFamily: "'DM Sans', sans-serif", fontWeight: "600", color: C.text, marginBottom: "4px" }}>{fix.title}</div>
+        <div style={{ fontSize: "13px", color: C.textDim, lineHeight: "1.6", fontFamily: "'DM Sans', sans-serif" }}>{fix.body}</div>
       </div>
-      {auditId && <ShareRow auditId={auditId} />}
-      <div style={{ display: "flex", gap: "24px", marginBottom: "32px", alignItems: "stretch" }}>
-        <ScoreGauge score={results.overallScore} />
-        <CategoryBars categories={results.categories} />
+    </div>
+  );
+
+  return (
+    <div style={{ animation: "fadeIn 0.5s ease" }}>
+
+      {/* 0. Back buttons */}
+      {onReset && (
+        <div style={{ display: "flex", gap: "12px", marginBottom: "32px" }}>
+          <button onClick={onReset} style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.textDim, borderRadius: "8px", padding: "10px 20px", fontSize: "12px", letterSpacing: "1.5px", textTransform: "uppercase", cursor: "pointer", fontFamily: "'DM Mono', monospace" }}>← New Audit</button>
+          {auditId && (
+            <Link to={`/report/${auditId}`} style={{ display: "inline-flex", alignItems: "center", background: "transparent", border: `1px solid ${C.accent}`, color: C.accent, borderRadius: "8px", padding: "10px 20px", fontSize: "12px", letterSpacing: "1.5px", textTransform: "uppercase", cursor: "pointer", fontFamily: "'DM Mono', monospace", textDecoration: "none" }}>
+              Full Report →
+            </Link>
+          )}
+        </div>
+      )}
+
+      {/* 1. Business badge */}
+      <div style={{ display: "inline-flex", alignItems: "center", gap: "8px", background: C.accentDim, border: `1px solid ${C.accent}`, borderRadius: "6px", padding: "6px 12px", fontSize: "12px", color: C.accent, marginBottom: "28px", fontFamily: "'DM Sans', sans-serif" }}>
+        <span style={{ opacity: 0.7 }}>audited</span>
+        <span>{businessName}</span>
+        {location && (
+          <>
+            <span style={{ opacity: 0.4 }}>·</span>
+            <span>{location}</span>
+          </>
+        )}
       </div>
-      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "12px", padding: "28px", marginBottom: "20px" }}>
-        <div style={{ fontSize: "11px", letterSpacing: "3px", textTransform: "uppercase", color: C.accent, marginBottom: "20px" }}>Key Findings</div>
-        {results.insights.map((ins, i) => (
+
+      {/* ══ FREE TIER ══ */}
+
+      {/* 2. Score row */}
+      <div style={{ display: "flex", gap: "24px", marginBottom: "28px", alignItems: "stretch" }}>
+        <ScoreGauge score={results?.overallScore ?? 0} />
+        <CategoryBars categories={results?.categories ?? []} />
+      </div>
+
+      {/* 3. Top fix */}
+      {topFix && (
+        <div style={cardStyle}>
+          {sectionHeader("TOP RECOMMENDATION")}
+          {fixRow(topFix, 0, [topFix])}
+        </div>
+      )}
+
+      {/* 4. Teaser */}
+      {remainingCount > 0 && (
+        <div style={{ fontSize: "13px", color: C.textDim, fontFamily: "'DM Sans', sans-serif", textAlign: "center", padding: "12px 0", marginBottom: "8px" }}>
+          "{remainingCount} more fix recommendation{remainingCount !== 1 ? "s" : ""} identified — upgrade to Starter to see them all"
+        </div>
+      )}
+
+      {/* ══ STARTER SECTION ══ */}
+
+      {/* 5. Starter banner */}
+      <TierBanner tier="Starter" color={C.yellow} message="Upgrade to Starter for $29/mo to unlock" />
+
+      {/* 6. All fixes card */}
+      <div style={cardStyle}>
+        {sectionHeader("RECOMMENDED FIXES")}
+        {fixes.map((fix, i) => fixRow(fix, i, fixes))}
+      </div>
+
+      {/* 7. Key findings card */}
+      <div style={cardStyle}>
+        {sectionHeader("KEY FINDINGS")}
+        {(results?.insights ?? []).map((ins, i) => (
           <div key={i} style={{ display: "flex", gap: "12px", alignItems: "flex-start", marginBottom: "14px" }}>
             <span style={{ fontSize: "16px", flexShrink: 0, marginTop: "1px" }}>{ins.icon}</span>
             <span style={{ fontSize: "14px", color: C.textDim, lineHeight: "1.6", fontFamily: "'DM Sans', sans-serif" }}>{ins.text}</span>
           </div>
         ))}
       </div>
-      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "12px", padding: "28px", marginBottom: "20px" }}>
-        <div style={{ fontSize: "11px", letterSpacing: "3px", textTransform: "uppercase", color: C.accent, marginBottom: "20px" }}>Recommended Fixes</div>
-        {results.fixes.map((fix, i) => (
-          <div key={i} style={{ borderBottom: i === results.fixes.length - 1 ? "none" : `1px solid ${C.border}`, padding: "16px 0", display: "flex", gap: "16px", alignItems: "flex-start" }}>
-            <PriorityBadge p={fix.priority} />
-            <div>
-              <div style={{ fontSize: "14px", fontFamily: "'DM Sans', sans-serif", fontWeight: "600", color: C.text, marginBottom: "4px" }}>{fix.title}</div>
-              <div style={{ fontSize: "13px", color: C.textDim, lineHeight: "1.6", fontFamily: "'DM Sans', sans-serif" }}>{fix.body}</div>
+
+      {/* 8. Shareable link */}
+      {auditId && <ShareRow auditId={auditId} />}
+
+      {/* ══ PRO SECTION ══ */}
+
+      {/* 9. Pro banner */}
+      <TierBanner tier="Pro" color={C.accent} message="Upgrade to Pro for $49/mo to unlock" />
+
+      {/* 10. Platform query cards */}
+      <QueryCard
+        platform="ChatGPT"
+        query={firstPrompt?.prompt}
+        matched={firstPrompt?.matched}
+        snippet={firstPrompt?.snippet}
+      />
+      <QueryCard
+        platform="Perplexity"
+        query={plx?.query}
+        matched={plx?.matched}
+        snippet={plx?.snippet}
+        error={plx?.error}
+      />
+      <QueryCard
+        platform="Claude"
+        query={cld?.query}
+        matched={cld?.matched}
+        snippet={cld?.snippet}
+        error={cld?.error}
+      />
+
+      {/* 11. Schema card */}
+      <div style={cardStyle}>
+        {sectionHeader("SCHEMA MARKUP")}
+        {schema?.found ? (
+          <>
+            <div style={{ fontSize: "14px", color: C.green, fontFamily: "'DM Sans', sans-serif", marginBottom: "12px" }}>
+              Found {schema.schemasFound ?? 1} JSON-LD block{(schema.schemasFound ?? 1) !== 1 ? "s" : ""}
             </div>
-          </div>
-        ))}
+            {(schema.relevantTypes ?? []).length > 0 && (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "16px" }}>
+                {schema.relevantTypes.map((type, i) => (
+                  <span key={i} style={{ fontSize: "11px", fontFamily: "'DM Mono', monospace", color: C.accent, background: "rgba(0,229,255,0.08)", border: `1px solid rgba(0,229,255,0.2)`, borderRadius: "4px", padding: "3px 10px" }}>{type}</span>
+                ))}
+              </div>
+            )}
+            {schema.rawSchemas?.[0] && (
+              <pre style={{ background: C.bg, color: "#a8d8a8", maxHeight: "280px", overflow: "auto", fontSize: "12px", padding: "16px", border: `1px solid ${C.border}`, borderRadius: "6px", margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-all", fontFamily: "'DM Mono', monospace" }}>
+                {typeof schema.rawSchemas[0] === "string"
+                  ? schema.rawSchemas[0]
+                  : JSON.stringify(schema.rawSchemas[0], null, 2)}
+              </pre>
+            )}
+          </>
+        ) : (
+          <>
+            <div style={{ fontSize: "14px", color: C.red, fontFamily: "'DM Sans', sans-serif", marginBottom: "8px" }}>No schema markup detected</div>
+            <div style={{ fontSize: "13px", color: C.textDim, fontFamily: "'DM Sans', sans-serif", lineHeight: "1.6" }}>
+              Add JSON-LD structured data to help AI search engines understand your business type, location, and services.
+            </div>
+          </>
+        )}
       </div>
+
+      {/* ══ AGENCY SECTION ══ */}
+
+      {/* 12. Agency banner + placeholder */}
+      <TierBanner tier="Agency" color="#a78bfa" message="All 3 AI platform queries, competitor data & PDF export" />
+      <div style={cardStyle}>
+        <div style={{ fontSize: "14px", fontFamily: "'DM Sans', sans-serif", color: C.textDim, lineHeight: "1.6" }}>
+          View the full Agency report at /report/:id for all platform queries, competitor analysis, and PDF export.
+          {auditId && (
+            <>
+              {" "}
+              <Link to={`/report/${auditId}`} style={{ color: C.accent, textDecoration: "none" }}>/report/{auditId}</Link>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* ══ BOTTOM CTA ══ */}
+
+      {/* 13. CTA card */}
       <div style={{ background: C.accentDim, border: `1px solid rgba(0,229,255,0.2)`, borderRadius: "12px", padding: "28px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px" }}>
         <div>
-          <div style={{ fontSize: "15px", fontFamily: "'DM Sans', sans-serif", fontWeight: "600", marginBottom: "4px" }}>Want us to fix this for you?</div>
+          <div style={{ fontSize: "15px", fontFamily: "'DM Sans', sans-serif", fontWeight: "600", color: C.text, marginBottom: "4px" }}>Want us to fix this for you?</div>
           <div style={{ fontSize: "13px", color: C.textDim, fontFamily: "'DM Sans', sans-serif" }}>Full implementation, monthly monitoring, and competitor tracking.</div>
         </div>
-        <Link to="/pricing" style={{ display: "inline-block", background: C.accent, color: C.bg, border: "none", borderRadius: "8px", padding: "16px 32px", fontSize: "13px", fontWeight: "700", letterSpacing: "2px", textTransform: "uppercase", cursor: "pointer", fontFamily: "'DM Mono', monospace", textDecoration: "none" }}>Get Full Report</Link>
+        <Link to="/pricing" style={{ display: "inline-block", background: C.accent, color: C.bg, border: "none", borderRadius: "8px", padding: "16px 32px", fontSize: "13px", fontWeight: "700", letterSpacing: "2px", textTransform: "uppercase", cursor: "pointer", fontFamily: "'DM Mono', monospace", textDecoration: "none" }}>
+          Get Full Report →
+        </Link>
       </div>
+
     </div>
   );
 }
