@@ -67,9 +67,9 @@ export default function Home() {
         {screen === "input" && (
           <div style={{ animation: "fadeIn 0.4s ease" }}>
             <div style={{ marginBottom: "52px" }}>
-              <span style={{ fontSize: "11px", letterSpacing: "3px", color: C.accent, textTransform: "uppercase", marginBottom: "16px", display: "block" }}>Agent Engine Optimization</span>
+              <span style={{ fontSize: "11px", letterSpacing: "3px", color: C.accent, textTransform: "uppercase", marginBottom: "16px", display: "block" }}>AI Search Visibility</span>
               <h1 style={{ fontSize: "42px", fontWeight: "700", lineHeight: "1.15", marginBottom: "16px", fontFamily: "'DM Sans', sans-serif", letterSpacing: "-1px" }}>Is AI recommending<br />your business?</h1>
-              <p style={{ fontSize: "16px", color: C.textDim, lineHeight: "1.6", maxWidth: "540px", fontFamily: "'DM Sans', sans-serif" }}>When someone asks ChatGPT, Claude, or Perplexity for a recommendation in your category — do you show up? Find out in 60 seconds.</p>
+              <p style={{ fontSize: "16px", color: C.textDim, lineHeight: "1.6", maxWidth: "540px", fontFamily: "'DM Sans', sans-serif" }}>When someone asks ChatGPT, Claude, or Perplexity for a recommendation in your category â€” do you show up? Find out in 60 seconds.</p>
             </div>
             <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "12px", padding: "36px", display: "flex", flexDirection: "column", gap: "24px" }}>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>

@@ -13,7 +13,7 @@ export function Header() {
   return (
     <div style={{ borderBottom: `1px solid ${C.border}`, padding: "20px 40px", display: "flex", alignItems: "center", gap: "12px", background: C.surface }}>
       <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: C.accent, boxShadow: `0 0 10px ${C.accent}`, animation: "pulse 2s infinite" }} />
-      <a href="/" style={{ fontSize: "13px", letterSpacing: "4px", color: C.accent, fontWeight: "700", textTransform: "uppercase", fontFamily: "'DM Mono', monospace", textDecoration: "none" }}>AEO Auditor</a>
+      <a href="/" style={{ fontSize: "13px", letterSpacing: "4px", color: C.accent, fontWeight: "700", textTransform: "uppercase", fontFamily: "'DM Mono', monospace", textDecoration: "none" }}>AIScorify</a>
     </div>
   );
 }
@@ -81,7 +81,7 @@ export function AuditResults({ results, auditId, businessName, location, onReset
       )}
       <div style={{ display: "inline-flex", alignItems: "center", gap: "8px", background: C.accentDim, border: `1px solid rgba(0,229,255,0.2)`, borderRadius: "6px", padding: "6px 12px", fontSize: "12px", color: C.accent, marginBottom: "20px" }}>
         <span style={{ opacity: 0.6 }}>audited</span>{businessName}
-        {location && <><span style={{ opacity: 0.4 }}>·</span>{location}</>}
+        {location && <><span style={{ opacity: 0.4 }}>Â·</span>{location}</>}
       </div>
       {auditId && <ShareRow auditId={auditId} />}
       <div style={{ display: "flex", gap: "24px", marginBottom: "32px", alignItems: "stretch" }}>

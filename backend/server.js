@@ -15,7 +15,7 @@ db.defaults({ audits: [] }).write();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
-const BASE_URL = process.env.BASE_URL || `http://localhost:${PORT}`;
+const BASE_URL = process.env.BASE_URL || "https://aiscorify.com";
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const OpenAI = require("openai");
 const openaiClient = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -171,7 +171,7 @@ async function checkSchemaMarkup(url) {
   const normalizedUrl = url.startsWith("http") ? url : `https://${url}`;
   try {
     const res = await fetch(normalizedUrl, {
-      headers: { "User-Agent": "AEOAuditor/1.0 (+https://aeoauditor.com)" },
+      headers: { "User-Agent": "AIScorify/1.0 (+https://aiscorify.com)" },
       signal: AbortSignal.timeout(10000),
     });
     if (!res.ok) return { found: false, types: [], error: `HTTP ${res.status}` };
@@ -210,6 +210,14 @@ async function checkSchemaMarkup(url) {
 app.use(express.json());
 app.use(cors({ origin: process.env.FRONTEND_URL || "http://localhost:5173", methods: ["GET", "POST"] }));
 
+// Redirect www.aiscorify.com → aiscorify.com
+app.use((req, res, next) => {
+  if (req.hostname === "www.aiscorify.com") {
+    return res.redirect(301, `https://aiscorify.com${req.originalUrl}`);
+  }
+  next();
+});
+
 const globalLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 100, standardHeaders: true, legacyHeaders: false });
 const AUDIT_RATE_LIMIT = parseInt(process.env.AUDIT_RATE_LIMIT || "3", 10);
 const auditLimiter = rateLimit({ windowMs: 24 * 60 * 60 * 1000, max: AUDIT_RATE_LIMIT, standardHeaders: true, legacyHeaders: false, message: { error: "Free audit limit reached.", message: `You have used your ${AUDIT_RATE_LIMIT} free audits for today.` } });
@@ -220,12 +228,12 @@ function buildOGImage(businessName, score, location, category) {
   const label = score >= 75 ? "Strong Visibility" : score >= 50 ? "Moderate Visibility" : score >= 30 ? "Weak Visibility" : "Near-Invisible to AI";
   const subtitle = [category, location].filter(Boolean).join(" · ") || "Business Audit";
   const displayName = businessName.length > 28 ? businessName.slice(0, 26) + "..." : businessName;
-  return `<svg width="1200" height="630" viewBox="0 0 1200 630" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#080c14"/><stop offset="100%" style="stop-color:#0d1a2e"/></linearGradient></defs><rect width="1200" height="630" fill="url(#bg)"/><circle cx="900" cy="315" r="120" fill="#0d1420" stroke="${scoreColor}" stroke-width="3"/><text x="900" y="295" text-anchor="middle" fill="${scoreColor}" font-family="system-ui" font-size="88" font-weight="700">${score}</text><text x="900" y="340" text-anchor="middle" fill="#4a5a7a" font-family="system-ui" font-size="18">/100</text><text x="900" y="385" text-anchor="middle" fill="${scoreColor}" font-family="system-ui" font-size="16" font-weight="600">${label}</text><rect x="60" y="52" width="12" height="12" rx="6" fill="#00e5ff"/><text x="84" y="63" fill="#00e5ff" font-family="system-ui" font-size="13" letter-spacing="4" font-weight="700">AEO AUDITOR</text><text x="60" y="200" fill="#e0e8ff" font-family="system-ui" font-size="52" font-weight="700">${displayName}</text><text x="60" y="250" fill="#7a8aa8" font-family="system-ui" font-size="18">${subtitle}</text><text x="60" y="340" fill="#4a5a7a" font-family="system-ui" font-size="13" letter-spacing="3">AGENT VISIBILITY SCORE</text><text x="60" y="570" fill="#4a5a7a" font-family="system-ui" font-size="14">See full report at aeoauditor.com</text></svg>`;
+  return `<svg width="1200" height="630" viewBox="0 0 1200 630" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#080c14"/><stop offset="100%" style="stop-color:#0d1a2e"/></linearGradient></defs><rect width="1200" height="630" fill="url(#bg)"/><circle cx="900" cy="315" r="120" fill="#0d1420" stroke="${scoreColor}" stroke-width="3"/><text x="900" y="295" text-anchor="middle" fill="${scoreColor}" font-family="system-ui" font-size="88" font-weight="700">${score}</text><text x="900" y="340" text-anchor="middle" fill="#4a5a7a" font-family="system-ui" font-size="18">/100</text><text x="900" y="385" text-anchor="middle" fill="${scoreColor}" font-family="system-ui" font-size="16" font-weight="600">${label}</text><rect x="60" y="52" width="12" height="12" rx="6" fill="#00e5ff"/><text x="84" y="63" fill="#00e5ff" font-family="system-ui" font-size="13" letter-spacing="4" font-weight="700">AIScorify</text><text x="60" y="200" fill="#e0e8ff" font-family="system-ui" font-size="52" font-weight="700">${displayName}</text><text x="60" y="250" fill="#7a8aa8" font-family="system-ui" font-size="18">${subtitle}</text><text x="60" y="340" fill="#4a5a7a" font-family="system-ui" font-size="13" letter-spacing="3">AGENT VISIBILITY SCORE</text><text x="60" y="570" fill="#4a5a7a" font-family="system-ui" font-size="14">See your score at aiscorify.com</text></svg>`;
 }
 
 function buildOGHtml(audit, appHtml) {
-  const title = `${audit.business_name} — AEO Score: ${audit.score}/100`;
-  const description = `${audit.business_name} scored ${audit.score}/100 on Agent Visibility.`;
+  const title = `${audit.business_name} — AIScorify Score: ${audit.score}/100`;
+  const description = `${audit.business_name} scored ${audit.score}/100 on AI Search Visibility.`;
   const imageUrl = `${BASE_URL}/api/og-image/${audit.id}`;
   const pageUrl = `${BASE_URL}/results/${audit.id}`;
   const ogTags = `<title>${title}</title><meta name="description" content="${description}"><meta property="og:type" content="website"><meta property="og:url" content="${pageUrl}"><meta property="og:title" content="${title}"><meta property="og:description" content="${description}"><meta property="og:image" content="${imageUrl}"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="${title}"><meta name="twitter:description" content="${description}"><meta name="twitter:image" content="${imageUrl}">`;
