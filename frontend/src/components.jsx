@@ -84,7 +84,10 @@ export function AuditResults({ results, auditId, businessName, location, onReset
   return (
     <div style={{ animation: "fadeIn 0.5s ease" }}>
       {onReset && (
-        <button onClick={onReset} style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.textDim, borderRadius: "8px", padding: "10px 20px", fontSize: "12px", letterSpacing: "1.5px", textTransform: "uppercase", cursor: "pointer", fontFamily: "'DM Mono', monospace", marginBottom: "32px" }}>? New Audit</button>
+        <div style={{ display: "flex", gap: "12px", marginBottom: "32px" }}>
+          <button onClick={onReset} style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.textDim, borderRadius: "8px", padding: "10px 20px", fontSize: "12px", letterSpacing: "1.5px", textTransform: "uppercase", cursor: "pointer", fontFamily: "'DM Mono', monospace" }}>? New Audit</button>
+          {auditId && <Link to={`/report/${auditId}`} style={{ display: "inline-flex", alignItems: "center", background: "transparent", border: `1px solid ${C.accent}`, color: C.accent, borderRadius: "8px", padding: "10px 20px", fontSize: "12px", letterSpacing: "1.5px", textTransform: "uppercase", cursor: "pointer", fontFamily: "'DM Mono', monospace", textDecoration: "none" }}>Full Report</Link>}
+        </div>
       )}
       <div style={{ display: "inline-flex", alignItems: "center", gap: "8px", background: C.accentDim, border: `1px solid rgba(0,229,255,0.2)`, borderRadius: "6px", padding: "6px 12px", fontSize: "12px", color: C.accent, marginBottom: "20px" }}>
         <span style={{ opacity: 0.6 }}>audited</span>{businessName}

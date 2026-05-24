@@ -11,7 +11,7 @@ const FileSync = require("lowdb/adapters/FileSync");
 
 const adapter = new FileSync("db.json");
 const db = low(adapter);
-db.defaults({ audits: [] }).write();
+db.defaults({ audits: [], feedback: [] }).write();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -143,6 +143,7 @@ async function checkOpenAIWebSearchPresence(name, url, category, location) {
       prompt,
       matched: businessMatchesResponse(name, url, text, citationDomains),
       webSearchFired: (data.output || []).some((o) => o.type === "web_search_call"),
+      snippet: text.slice(0, 600),
     };
   });
 
@@ -198,9 +199,89 @@ async function checkSchemaMarkup(url) {
       relevantTypes,
       schemasFound: schemas.length,
       hasLocalBusiness: relevantTypes.length > 0,
+      rawSchemas: schemas.slice(0, 3),
     };
   } catch (err) {
     return { found: false, types: [], error: err.message };
+  }
+}
+
+// ─── Real signal: Perplexity sonar presence ──────────────────────────────────
+async function checkPerplexityPresence(name, url, category, location) {
+  const cat = category || "business";
+  const loc = location || "any area";
+  const national = isNationalBusiness(location);
+  const query = national ? `${name} ${cat} reviews` : `best ${cat} in ${loc}`;
+
+  if (!process.env.PERPLEXITY_API_KEY) {
+    return { query, matched: false, snippet: null, error: "PERPLEXITY_API_KEY not set", queryType: national ? "national" : "local" };
+  }
+
+  try {
+    const res = await fetch("https://api.perplexity.ai/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.PERPLEXITY_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "sonar",
+        messages: [{ role: "user", content: query }],
+      }),
+      signal: AbortSignal.timeout(30_000),
+    });
+    if (!res.ok) {
+      const errText = await res.text().catch(() => "");
+      throw new Error(`Perplexity ${res.status}: ${errText.slice(0, 200)}`);
+    }
+    const data = await res.json();
+    const text = data.choices?.[0]?.message?.content || "";
+    return {
+      query,
+      matched: businessMatchesText(name, url, text),
+      snippet: text.slice(0, 600),
+      queryType: national ? "national" : "local",
+    };
+  } catch (err) {
+    console.error("Perplexity check failed:", err.message);
+    return { query, matched: false, snippet: null, error: err.message, queryType: national ? "national" : "local" };
+  }
+}
+
+// ─── Real signal: Claude with web search ─────────────────────────────────────
+async function checkClaudePresence(name, url, category, location) {
+  const cat = category || "business";
+  const loc = location || "any area";
+  const national = isNationalBusiness(location);
+  const query = national ? `${name} ${cat} reviews` : `best ${cat} in ${loc}`;
+
+  try {
+    const message = await client.messages.create(
+      {
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 512,
+        tools: [{ type: "web_search_20250305", name: "web_search" }],
+        messages: [{ role: "user", content: query }],
+      },
+      { headers: { "anthropic-beta": "web-search-2025-03-05" } }
+    );
+    const text = (message.content || [])
+      .filter((b) => b.type === "text")
+      .map((b) => b.text)
+      .join("");
+    const webSearchFired = (message.content || []).some(
+      (b) => b.type === "tool_use" && b.name === "web_search"
+    );
+    return {
+      query,
+      matched: businessMatchesText(name, url, text),
+      snippet: text.slice(0, 600),
+      webSearchFired,
+      queryType: national ? "national" : "local",
+    };
+  } catch (err) {
+    console.error("Claude presence check failed:", err.message);
+    return { query, matched: false, snippet: null, error: err.message, queryType: national ? "national" : "local" };
   }
 }
 
@@ -258,18 +339,28 @@ app.post("/api/audit", auditLimiter, async (req, res) => {
   catch { return res.status(400).json({ error: "Invalid URL." }); }
 
   try {
-    // ── Run real signals in parallel ────────────────────────────────────────
-    const [aiSearch, schema] = await Promise.all([
+    // ── Run all signals in parallel ──────────────────────────────────────────
+    const [aiSearch, perplexity, claude, schema] = await Promise.all([
       checkOpenAIWebSearchPresence(name, url, category, location)
         .catch((err) => ({ score: null, promptsTested: 3, promptsMatched: 0, prompts: [], queryType: "local", error: err.message })),
+      checkPerplexityPresence(name, url, category, location)
+        .catch((err) => ({ query: "", matched: false, snippet: null, error: err.message })),
+      checkClaudePresence(name, url, category, location)
+        .catch((err) => ({ query: "", matched: false, snippet: null, error: err.message })),
       checkSchemaMarkup(url)
-        .catch((err) => ({ found: false, types: [], relevantTypes: [], schemasFound: 0, hasLocalBusiness: false, error: err.message })),
+        .catch((err) => ({ found: false, types: [], relevantTypes: [], schemasFound: 0, hasLocalBusiness: false, rawSchemas: [], error: err.message })),
     ]);
 
-    // ── Build real-signal context for Claude ─────────────────────────────────
+    // ── Build real-signal context for Claude analysis ─────────────────────────
     const aiLine = aiSearch.score !== null
       ? `${aiSearch.score}/100 — appeared in ${aiSearch.promptsMatched}/${aiSearch.promptsTested} ChatGPT web search queries (${aiSearch.queryType} prompts)`
       : `unavailable (${aiSearch.error || "unknown error"})`;
+    const plxLine = perplexity.error
+      ? `unavailable (${perplexity.error})`
+      : `${perplexity.matched ? "mentioned" : "not mentioned"} in Perplexity sonar response to "${perplexity.query}"`;
+    const claudeLine = claude.error
+      ? `unavailable (${claude.error})`
+      : `${claude.matched ? "mentioned" : "not mentioned"} in Claude web search response to "${claude.query}"`;
     const schemaLine = schema.found
       ? `${schema.schemasFound} JSON-LD block(s) found; types: ${schema.types.join(", ")}; relevant: ${schema.relevantTypes.join(", ") || "none"}`
       : `no JSON-LD schema detected${schema.error ? ` (${schema.error})` : ""}`;
@@ -277,6 +368,8 @@ app.post("/api/audit", auditLimiter, async (req, res) => {
     const signalBlock = `
 REAL MEASURED SIGNALS (use these to anchor your scoring — do not contradict them):
 - ChatGPT Web Search AI Presence: ${aiLine}
+- Perplexity AI Presence: ${plxLine}
+- Claude AI Presence: ${claudeLine}
 - Schema Markup on ${url}: ${schemaLine}
 `;
 
@@ -306,8 +399,8 @@ Respond ONLY with valid JSON, no markdown:
     const raw = message.content.map((b) => b.text || "").join("");
     const results = JSON.parse(raw.replace(/```json|```/g, "").trim());
 
-    // ── Attach real signal results to response ────────────────────────────────
-    results.signals = { aiSearch, schema };
+    // ── Attach all platform signal results to response ───────────────────────
+    results.signals = { aiSearch, perplexity, claude, schema };
 
     const auditId = uuidv4();
     const audit = {
@@ -338,6 +431,20 @@ app.get("/api/audit/:id", (req, res) => {
   return res.json({ auditId: audit.id, businessName: audit.business_name, businessUrl: audit.business_url, category: audit.category, location: audit.location, createdAt: audit.created_at, shareUrl: `/results/${audit.id}`, ...JSON.parse(audit.results) });
 });
 
+app.post("/api/feedback", (req, res) => {
+  const { auditId, type, message } = req.body;
+  if (!type) return res.status(400).json({ error: "type is required" });
+  const item = {
+    id: uuidv4(),
+    auditId: auditId || null,
+    type,
+    message: message || null,
+    created_at: new Date().toISOString(),
+  };
+  db.get("feedback").push(item).write();
+  return res.json({ success: true, id: item.id });
+});
+
 app.get("/api/audits/recent", (req, res) => {
   if (req.headers["x-admin-key"] !== process.env.ADMIN_KEY) return res.status(401).json({ error: "Unauthorized." });
   const audits = db.get("audits").orderBy("created_at", "desc").take(50).value();
@@ -345,6 +452,14 @@ app.get("/api/audits/recent", (req, res) => {
 });
 
 app.get("/results/:id", (req, res) => {
+  if (!fs.existsSync(INDEX_HTML)) return res.status(404).send("Frontend not built yet.");
+  const audit = db.get("audits").find({ id: req.params.id }).value();
+  const html = fs.readFileSync(INDEX_HTML, "utf8");
+  if (!audit) return res.send(html);
+  return res.send(buildOGHtml(audit, html));
+});
+
+app.get("/report/:id", (req, res) => {
   if (!fs.existsSync(INDEX_HTML)) return res.status(404).send("Frontend not built yet.");
   const audit = db.get("audits").find({ id: req.params.id }).value();
   const html = fs.readFileSync(INDEX_HTML, "utf8");

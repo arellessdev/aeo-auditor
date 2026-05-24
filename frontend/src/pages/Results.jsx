@@ -45,9 +45,12 @@ export default function Results() {
           <div style={{ animation: "fadeIn 0.4s ease" }}>
             <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "10px", padding: "14px 20px", marginBottom: "32px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px" }}>
               <div style={{ fontSize: "13px", color: C.textDim, fontFamily: "'DM Sans', sans-serif" }}>
-                Shared audit · {new Date(data.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                Shared audit ï¿½ {new Date(data.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
               </div>
-              <Link to="/" style={{ fontSize: "12px", color: C.accent, textDecoration: "none", letterSpacing: "1px", textTransform: "uppercase", fontFamily: "'DM Mono', monospace" }}>Audit your business ?</Link>
+              <div style={{ display: "flex", gap: "16px", alignItems: "center" }}>
+                <Link to={`/report/${data.auditId}`} style={{ fontSize: "12px", color: C.accent, textDecoration: "none", letterSpacing: "1px", textTransform: "uppercase", fontFamily: "'DM Mono', monospace" }}>Full Report</Link>
+                <Link to="/" style={{ fontSize: "12px", color: C.textDim, textDecoration: "none", letterSpacing: "1px", textTransform: "uppercase", fontFamily: "'DM Mono', monospace" }}>New Audit</Link>
+              </div>
             </div>
             <AuditResults results={data} auditId={data.auditId} businessName={data.businessName} location={data.location} />
           </div>
